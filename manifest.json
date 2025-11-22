@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Smart Auto Scroller",
+  "version": "0.1",
+  "description": "Floating reader icon with opacity control. Auto-scroll coming soon.",
+  "icons": {
+    "48": "icons/icon-48.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://novelbin.com/*"
+  ],
+  "content_scripts": [
+  {
+    "matches": ["*://novelbin.com/*"],
+    "js": ["content/index.js"],
+    "css": ["styles/panel.css"],
+    "run_at": "document_idle"
+    
+  }
+  ],
+  "action": {
+    "default_title": "Smart Auto Scroller"
+  }
+}

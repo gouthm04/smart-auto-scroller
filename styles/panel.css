@@ -1,0 +1,106 @@
+#as-floating-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+
+  background-image: url("../icons/icon-48.png");
+  background-size: 60%;
+  background-repeat: no-repeat;
+  background-position: center;
+
+  background-color: rgba(224, 203, 203, 0);
+  border-radius: 50%;
+
+  cursor: pointer;
+  opacity: 0.5;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 2147483647;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+#as-floating-button:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+
+#as-panel {
+  position: fixed;
+  top: 75px;        /* appears below icon */
+  right: 20px;
+  width: 280px;
+
+  background: rgba(20, 20, 20, 0.95);
+  color: white;
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 12px 25px rgba(0,0,0,0.45);
+
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-10px);
+
+  overflow: hidden;
+  pointer-events: none;
+
+  transition:
+    max-height 0.25s ease,
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+#as-panel.as-expanded {
+  max-height: 400px;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.as-section {
+  margin: 12px 0;       /* increases vertical spacing */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;             /* adds internal spacing */
+}
+
+
+.as-main-btn {
+  width: 100%;
+  padding: 10px 0;
+  border: none;
+  border-radius: 6px;
+  background: #2e7d32;
+  color: rgb(0, 0, 0);
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 8px;    /* spacing below button */
+}
+
+.as-main-btn:hover {
+  background: #388e3c;
+}
+
+.as-preset-row {
+  display: flex;
+  gap: 8px;              /* bigger gap between preset buttons */
+}
+.as-preset-btn{
+    background: #2e7d32;
+    color: rgb(0, 0, 0);
+    margin-left: auto;
+    margin-right: auto;
+
+
+}
+.as-option {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;             /* label checkbox spacing */
+  margin: 6px 0;         /* spacing between options */
+}
