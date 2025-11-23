@@ -52,9 +52,17 @@ function injectPanel() {
 </div>
 
 <div class="as-section">
-  <label class="as-option"><input type="checkbox" id="as-auto-next"> Auto Next Chapter</label>
-  <label class="as-option"><input type="checkbox" id="as-dark-mode"> Dark Mode</label>
+  <div class="as-toggle-container">
+    <span>Auto Next Chapter</span>
+    <div class="as-toggle-switch" id="as-auto-next"></div>
+  </div>
+
+  <div class="as-toggle-container">
+    <span>Dark Mode</span>
+    <div class="as-toggle-switch" id="as-dark-mode"></div>
+  </div>
 </div>
+
 
   `;
 
@@ -62,7 +70,22 @@ function injectPanel() {
 
   
 }
+function setupToggles() {
+  const autoNextToggle = document.getElementById("as-auto-next");
+  const darkModeToggle = document.getElementById("as-dark-mode");
+
+  autoNextToggle.addEventListener("click", () => {
+    autoNextToggle.classList.toggle("as-on");
+  });
+
+  darkModeToggle.addEventListener("click", () => {
+    darkModeToggle.classList.toggle("as-on");
+  });
+}
+
+
 
 // ===== RUN UI =====
 injectFloatingButton();
 injectPanel();
+setupToggles();
