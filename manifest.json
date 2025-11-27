@@ -1,27 +1,20 @@
 {
-  "manifest_version": 3,
-  "name": "Smart Auto Scroller",
-  "version": "0.1",
-  "description": "Floating reader icon with opacity control. Auto-scroll coming soon.",
+  "manifest_version": 2,
+  "name": "Floating Icon Overlay",
+  "version": "1.0",
+  "description": "Shows a floating icon on the top-right of all websites.",
+
   "icons": {
-    "48": "icons/icon-48.png"
+    "48": "icon.png"
   },
-  "permissions": [
-    "storage"
-  ],
-  "host_permissions": [
-    "https://novelbin.com/*"
-  ],
+
+  "permissions": ["<all_urls>"],
+
   "content_scripts": [
-  {
-    "matches": ["*://novelbin.com/*"],
-    "js": ["content/index.js"],
-    "css": ["styles/panel.css"],
-    "run_at": "document_idle"
-    
-  }
-  ],
-  "action": {
-    "default_title": "Smart Auto Scroller"
-  }
+    {
+      "matches": ["<all_urls>"],
+      "css": ["style.css"],
+      "js": ["content.js"]
+    }
+  ]
 }

@@ -1,4 +1,0 @@
-next to do is auto darkmode detection and change according : so a togle to on of this feature is needed
-need to detect site dark mode or not
-also a manual dark mode togle is nneded if auto dark mode switch is off 
-toggle btn instead of checkboxes
