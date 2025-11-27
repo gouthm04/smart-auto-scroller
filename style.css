@@ -2,8 +2,8 @@
     position: fixed;
     top: 50px;
     right: 50px;
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     z-index: 999999;
     cursor: pointer;
 
@@ -12,4 +12,180 @@
     border-radius: 50%;
     padding: 6px;
     filter: drop-shadow(0 0 4px white);
+}
+#overlay-panel {
+    position: fixed;
+    top: 110px;           /* just below your icon */
+    right: 50px;
+    width: 260px;
+    
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+
+    z-index: 999998;
+
+    /* Start hidden */
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-10px);
+    transition:
+        opacity 0.25s ease,
+        transform 0.25s ease;
+}
+
+#overlay-panel.open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+#overlay-panel h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    color: #000;
+}
+
+#overlay-panel p {
+    margin: 0;
+    font-size: 14px;
+    color: #333;
+}
+/* Panel Layout */
+
+.panel-content {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* Main button (Start/Stop) */
+.panel-btn {
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #020420;
+    background: #00DC82; /* Nuxt green */
+    transition: 0.2s;
+}
+
+.panel-btn:hover {
+    background: #00c875;
+}
+
+/* Secondary button (Auto Next) */
+.panel-btn.secondary {
+    background: #1a2333;
+    color: #fff;
+}
+
+.panel-btn.secondary:hover {
+    background: #222c40;
+}
+
+/* SPEED SLIDER AREA */
+.speed-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.speed-section label {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 13px;
+}
+
+#speed-slider {
+    width: 100%;
+    cursor: pointer;
+    accent-color: #00DC82; /* slider track + thumb color */
+}
+
+/* PRESET BUTTONS */
+.preset-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.preset {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    color: #020420; /* dark text for contrast */
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+/* Nuxt-green-inspired, cohesive preset colors */
+
+/* SLOW — soft mint */
+.preset.slow {
+    background: #33E29F;
+}
+.preset.slow:hover {
+    background: #28c98b;
+}
+
+/* MEDIUM — neutral teal */
+.preset.medium {
+    background: #0FB57A;
+}
+.preset.medium:hover {
+    background: #0da169;
+}
+
+/* FAST — deep, bright Nuxt green */
+.preset.fast {
+    background: #00C56E;
+}
+.preset.fast:hover {
+    background: #00ab60;
+}
+
+/* Panel Background Update (Nuxt-style card) */
+#overlay-panel {
+    background: rgba(3, 6, 27, 0.9); /* #020420 but translucent */
+    backdrop-filter: blur(12px);
+    color: white;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+/* Speed control layout */
+.speed-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Minimal outline style for + / - buttons */
+.speed-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 2px solid #00DC82;  /* thin Nuxt-green outline */
+    background: transparent;
+    color: #00DC82;             /* matching text */
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+/* Hover: slight glow + soft tint */
+.speed-btn:hover {
+    background: rgba(0, 220, 130, 0.15);
+    box-shadow: 0 0 6px rgba(0, 220, 130, 0.4);
 }
