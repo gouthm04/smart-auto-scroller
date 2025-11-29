@@ -149,15 +149,24 @@
 .preset.fast:hover {
     background: #00ab60;
 }
+#btn-reading-mode {
+    background: #1a2333;
+}
+#btn-reading-mode:hover {
+    background: #222c40;
+}
 
 /* Panel Background Update (Nuxt-style card) */
 #overlay-panel {
+        position: fixed;
     background: rgba(3, 6, 27, 0.9); /* #020420 but translucent */
     backdrop-filter: blur(12px);
     color: white;
     border-radius: 16px;
     padding: 16px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+        overflow: hidden;   /* THIS IS THE REAL FIX */
+
 }
 /* Speed control layout */
 .speed-control {
@@ -188,4 +197,21 @@
 .speed-btn:hover {
     background: rgba(0, 220, 130, 0.15);
     box-shadow: 0 0 6px rgba(0, 220, 130, 0.4);
+}
+#progress-bar-container {
+    width: 100%;
+    height: 3px;
+    margin-top: 6px;
+}
+#panel-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    width: 0%;
+    background: #00DC82;
+    box-shadow: 0 0 8px #00DC82;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+    transition: width 0.2s linear;
 }
