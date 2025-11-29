@@ -135,6 +135,44 @@ let isEyePaused = false;
 
 let smoothFactor = 1;
 let targetFactor = 1;
+let autoPausedByVisibility = false;
+
+// Pause when tab/app goes out of focus
+function pauseForVisibility() {
+    if (!scrolling) return;
+    autoPausedByVisibility = true;
+}
+
+// Resume when tab/app comes back
+function resumeFromVisibility() {
+    if (!scrolling) return;
+
+    autoPausedByVisibility = false;
+
+    // prevent speed jump
+    lastTimestamp = null;
+
+    // delay ~250ms before resuming
+    setTimeout(() => {
+        if (scrolling && !autoPausedByVisibility) {
+            requestAnimationFrame(autoScroll);
+        }
+    }, 250);  // quarter-second pause
+}
+
+// Tab becomes hidden → pause
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) pauseForVisibility();
+    else resumeFromVisibility();
+});
+
+// Window loses focus → pause
+window.addEventListener("blur", pauseForVisibility);
+
+// Window regains focus → resume
+window.addEventListener("focus", resumeFromVisibility);
+
+
 
 // ----------------------------------------------------
 //  Restore saved settings & resume flag
@@ -261,6 +299,11 @@ function autoScroll(timestamp) {
         lastTimestamp = null;
         return;
     }
+    if (autoPausedByVisibility) {
+        lastTimestamp = null;
+        return;
+    }
+
     if (isEyePaused) return;
 
     if (!lastTimestamp) lastTimestamp = timestamp;
