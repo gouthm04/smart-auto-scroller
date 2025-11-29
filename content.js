@@ -50,22 +50,16 @@ const storage = {
 };
 
 // ----------------------------------------------------
-//  GLOBAL HELPERS
+//  Helpers
 // ----------------------------------------------------
-
-// jQuery-like contains helper
 document.querySelectorAllContains = function(tag, text) {
     return Array.from(document.querySelectorAll(tag))
         .filter(el => el && el.innerText && el.innerText.toLowerCase().includes(text.toLowerCase()));
 };
-
-// safe getText
-function safeInnerText(el) {
-    try { return (el && el.innerText) ? el.innerText : ""; } catch { return ""; }
-}
+function safeInnerText(el){ try { return el && el.innerText ? el.innerText : ""; } catch { return ""; } }
 
 // ----------------------------------------------------
-//  ICON + PANEL UI
+//  UI (icon + panel) - injected early
 // ----------------------------------------------------
 const icon = document.createElement("img");
 icon.id = "overlay-icon";
@@ -107,27 +101,25 @@ panel.innerHTML = `
     <div id="panel-progress"></div>
 `;
 
-// Append UI early (so it's visible even while storage resolves)
 document.body.appendChild(icon);
 document.body.appendChild(panel);
 
-// Element refs (now that panel exists)
 const btnScroll = panel.querySelector("#btn-toggle-scroll");
 const btnAutoNext = panel.querySelector("#btn-auto-next");
 const btnMode = panel.querySelector("#btn-reading-mode");
 const slider = panel.querySelector("#speed-slider");
 const speedText = panel.querySelector("#speed-value");
 
-// small toggle
 icon.addEventListener("click", () => panel.classList.toggle("open"));
 
 // ----------------------------------------------------
-//  STATE (defaults)
- // ----------------------------------------------------
+//  State defaults
+// ----------------------------------------------------
 let readingMode = "glide";     // 'glide' or 'eye'
-let scrolling = false;         // should scroll now?
-let autoNext = false;          // auto-next enabled?
-let speed = 50;                // 1..100
+let scrolling = false;         // user-intended on/off
+let autoNext = false;
+let speed = 50;
+
 let pauseToken = 0;
 let carry = 0;
 let lastTimestamp = null;
@@ -136,10 +128,21 @@ let isEyePaused = false;
 let smoothFactor = 1;
 let targetFactor = 1;
 
-// ----------------------------------------------------
-//  Restore saved settings & resume flag
-// ----------------------------------------------------
-(async function initFromStorage() {
+// manual interaction flags for soft resume
+let activePausedByUser = false;   // user scrolled -> temporary pause
+let allowAutoResume = true;       // set false if user scrolled backward or big jump
+let lastUserScrollTime = 0;
+let lastUserScrollPos = window.scrollY;
+let lastWheelTimestamp = 0;
+let userScrollQuietTimeout = null;
+
+// visibility pause
+let autoPausedByVisibility = false;
+
+// -----------------------
+// Restore settings & resume flag on load
+// -----------------------
+(async function init() {
     try {
         const saved = await storage.get(["autoNext", "scrolling", "speed", "readingMode", "resumeScrolling"]);
         if (saved.autoNext !== undefined) {
@@ -155,27 +158,90 @@ let targetFactor = 1;
             readingMode = saved.readingMode;
             btnMode.textContent = readingMode === "glide" ? "Mode: Glide" : "Mode: Eye";
         }
-        // If resumeScrolling flag was set (auto-next clicked previous page),
-        // restore scrolling state and clear the flag.
+        // If resume flag is present, wait for stable layout then start from top and ramp-in
         if (saved.resumeScrolling) {
+            // clear flag immediately to avoid double triggers
+            storage.set({ resumeScrolling: false }).catch(()=>{});
+            // wait for stable layout then start
+            await waitForStableLayout({stableMs:400, timeout:5000});
+            scrollToTopImmediate();
+            await rampIn(300);
             scrolling = true;
             btnScroll.textContent = "Stop Scrolling";
-            // clear resume flag for next time
-            storage.set({ resumeScrolling: false }).catch(()=>{});
             requestAnimationFrame(autoScroll);
-        } else if (saved.scrolling) {
-            // If the user explicitly had scrolling ON, restore it
+            return;
+        }
+        // otherwise restore explicit scrolling preference
+        if (saved.scrolling) {
             scrolling = !!saved.scrolling;
             btnScroll.textContent = scrolling ? "Stop Scrolling" : "Start Scrolling";
-            if (scrolling) requestAnimationFrame(autoScroll);
+            if (scrolling) {
+                // small delay to let page settle a little
+                await waitForStableLayout({stableMs:200, timeout:2000});
+                requestAnimationFrame(autoScroll);
+            }
         }
     } catch (e) {
-        console.warn("initFromStorage failed:", e);
+        console.warn("init failed:", e);
     }
 })();
 
 // ----------------------------------------------------
-//  TEXT DENSITY MEASUREMENT
+// Wait for stable layout: resolve when document.body.scrollHeight hasn't changed for stableMs ms
+// ----------------------------------------------------
+function waitForStableLayout({stableMs = 400, timeout = 4000} = {}) {
+    return new Promise((resolve) => {
+        const start = Date.now();
+        let lastHeight = document.body ? document.body.scrollHeight : 0;
+        let lastChange = Date.now();
+
+        const check = () => {
+            const now = Date.now();
+            const currentHeight = document.body ? document.body.scrollHeight : 0;
+            if (currentHeight !== lastHeight) {
+                lastHeight = currentHeight;
+                lastChange = now;
+            }
+            if (now - lastChange >= stableMs) {
+                resolve();
+                return;
+            }
+            if (now - start > timeout) {
+                resolve();
+                return;
+            }
+            setTimeout(check, 150);
+        };
+        // small initial delay to allow immediate changes
+        setTimeout(check, 120);
+    });
+}
+
+// ----------------------------------------------------
+// Jump-to-top (immediate) and ramp-in
+// ----------------------------------------------------
+function scrollToTopImmediate() {
+    try {
+        window.scrollTo(0, 0);
+    } catch {}
+}
+
+function rampIn(duration = 300) {
+    return new Promise(res => {
+        const start = performance.now();
+        const startVal = 0.05;
+        function step(t) {
+            const p = Math.min(1, (t - start) / duration);
+            smoothFactor = startVal + (1 - startVal) * p;
+            if (p < 1) requestAnimationFrame(step);
+            else res();
+        }
+        requestAnimationFrame(step);
+    });
+}
+
+// ----------------------------------------------------
+// Text density & smooth factor
 // ----------------------------------------------------
 function measureTextDensity() {
     const samples = [];
@@ -199,75 +265,173 @@ function measureTextDensity() {
     let density = (avgLen / 180) * 0.5 + (punct / samples.length) * 0.3 + (long / samples.length) * 0.2;
     return Math.min(1, density);
 }
-
-// ----------------------------------------------------
-//  SMOOTH FACTOR
-// ----------------------------------------------------
 function updateSmoothFactor(elapsed) {
     const lerpSpeed = 0.12;
     smoothFactor += (targetFactor - smoothFactor) * lerpSpeed * (elapsed / 16.67);
-    smoothFactor = Math.max(0.2, Math.min(1, smoothFactor));
+    smoothFactor = Math.max(0.05, Math.min(1, smoothFactor)); // allow lower during ramp
 }
 
 // ----------------------------------------------------
-//  FIND NEXT CHAPTER BUTTON (scoring + heuristics)
-// ----------------------------------------------------
+// Find next chapter button (heuristic)
+ // ----------------------------------------------------
 function findNextChapterButton() {
-    // gather candidate anchors/buttons
     const candidates = Array.from(document.querySelectorAll("a, button"));
-    let best = null;
-    let bestScore = 0;
-
+    let best = null; let bestScore = 0;
     const regex = /(chapter|episode|next|continue|>>|>|\bpart\b|section|act|volume)/i;
-
     for (const el of candidates) {
         const t = safeInnerText(el).trim();
         if (!t) continue;
-
         const m = t.match(regex);
         if (!m) continue;
-
         let score = 1;
-
         const lower = t.toLowerCase();
         if (/next chapter/i.test(t)) score += 5;
         if (/next/i.test(lower)) score += 3;
         if (/continue/i.test(lower)) score += 2;
         if (/^>$|^>>$/.test(lower)) score += 1;
         if (el.matches && el.matches(".btn, button, .next, .nav-next, .pagination-next")) score += 2;
-        // prefer shorter labels (button-like)
         if (t.length < 40) score += 1;
-
-        // prefer visible and clickable
         const rect = el.getBoundingClientRect();
         if (rect.width < 10 || rect.height < 10) score -= 2;
         if (rect.top < 0 && rect.bottom < 0) score -= 1;
-
-        if (score > bestScore) {
-            bestScore = score;
-            best = el;
-        }
+        if (score > bestScore) { bestScore = score; best = el; }
     }
-
     return best;
 }
 
 // ----------------------------------------------------
-//  AUTO SCROLL ENGINE
+// Bounce animation (medium): +8px then -5px
+// ----------------------------------------------------
+function animateBounce({down = 8, up = 5, downMs = 90, upMs = 90} = {}) {
+    return new Promise(resolve => {
+        const startY = window.scrollY;
+        const downStart = performance.now();
+        function stepDown(t) {
+            const p = Math.min(1, (t - downStart) / downMs);
+            window.scrollTo(0, startY + Math.round(down * p));
+            if (p < 1) requestAnimationFrame(stepDown);
+            else {
+                const upStart = performance.now();
+                function stepUp(u) {
+                    const q = Math.min(1, (u - upStart) / upMs);
+                    window.scrollTo(0, startY + down - Math.round(up * q));
+                    if (q < 1) requestAnimationFrame(stepUp);
+                    else { resolve(); }
+                }
+                requestAnimationFrame(stepUp);
+            }
+        }
+        requestAnimationFrame(stepDown);
+    });
+}
+
+// ----------------------------------------------------
+// Soft-resume user interaction logic
+// ----------------------------------------------------
+function onUserWheel(e) {
+    // if auto-scroll is not enabled, do nothing
+    if (!scrolling) return;
+    const delta = e.deltaY;
+    lastWheelTimestamp = Date.now();
+    lastUserScrollPos = window.scrollY;
+    lastUserScrollTime = Date.now();
+
+    // mark paused by user
+    activePausedByUser = true;
+
+    // if user scrolled up/backwards, disallow auto-resume until user toggles
+    if (delta < 0) allowAutoResume = false;
+
+    // if large jump, disallow resume
+    if (Math.abs(delta) > 300) allowAutoResume = false;
+
+    // clear previous timeout
+    if (userScrollQuietTimeout) clearTimeout(userScrollQuietTimeout);
+
+    // set quiet timeout for resume
+    userScrollQuietTimeout = setTimeout(() => {
+        // only resume if allowed
+        if (!allowAutoResume) {
+            // remain paused; do not auto-resume
+            activePausedByUser = true;
+            return;
+        }
+        // resume only if user hasn't scrolled back (we check recent delta)
+        // and user didn't cause large jump
+        activePausedByUser = false;
+        // restart autoScroll loop
+        lastTimestamp = null;
+        rampIn(220).then(()=> {
+            if (scrolling && !isEyePaused && !autoPausedByVisibility) requestAnimationFrame(autoScroll);
+        });
+    }, 120);
+}
+
+function onUserTouchStart() {
+    if (!scrolling) return;
+    activePausedByUser = true;
+    allowAutoResume = true;
+    if (userScrollQuietTimeout) clearTimeout(userScrollQuietTimeout);
+}
+function onUserTouchEnd() {
+    if (!scrolling) return;
+    if (userScrollQuietTimeout) clearTimeout(userScrollQuietTimeout);
+    userScrollQuietTimeout = setTimeout(() => {
+        if (!allowAutoResume) { activePausedByUser = true; return; }
+        activePausedByUser = false;
+        lastTimestamp = null;
+        rampIn(220).then(() => {
+            if (scrolling && !isEyePaused && !autoPausedByVisibility) requestAnimationFrame(autoScroll);
+        });
+    }, 150);
+}
+
+// attach listeners
+window.addEventListener("wheel", onUserWheel, {passive: true});
+window.addEventListener("touchstart", onUserTouchStart, {passive: true});
+window.addEventListener("touchend", onUserTouchEnd, {passive: true});
+
+// Pause when tab not visible or window blurred (Firefox-compatible)
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        autoPausedByVisibility = true;
+    } else {
+        // resume if needed
+        autoPausedByVisibility = false;
+        if (scrolling && !activePausedByUser && !isEyePaused) {
+            lastTimestamp = null;
+            requestAnimationFrame(autoScroll);
+        }
+    }
+});
+window.addEventListener("blur", () => { autoPausedByVisibility = true; });
+window.addEventListener("focus", () => {
+    autoPausedByVisibility = false;
+    if (scrolling && !activePausedByUser && !isEyePaused) {
+        lastTimestamp = null;
+        requestAnimationFrame(autoScroll);
+    }
+});
+
+// ----------------------------------------------------
+//  Auto scroll engine (main loop)
 // ----------------------------------------------------
 function autoScroll(timestamp) {
-    if (!scrolling) {
-        carry = 0;
+    // global gating
+    if (!scrolling || activePausedByUser || autoPausedByVisibility) {
         lastTimestamp = null;
         return;
     }
-    if (isEyePaused) return;
+    if (isEyePaused) {
+        lastTimestamp = null;
+        return;
+    }
 
     if (!lastTimestamp) lastTimestamp = timestamp;
     const elapsed = timestamp - lastTimestamp;
     lastTimestamp = timestamp;
 
-    // Adaptive (glide) mode
+    // adaptive glide mode: text density -> target factor
     if (readingMode === "glide") {
         const density = measureTextDensity();
         const minFactor = 0.6;
@@ -277,7 +441,6 @@ function autoScroll(timestamp) {
 
     const normalized = speed / 100;
     const baseSpeed = Math.pow(normalized, 1.7) * 8;
-
     updateSmoothFactor(elapsed);
     const pixels = baseSpeed * smoothFactor * (elapsed / 16.67);
 
@@ -287,9 +450,9 @@ function autoScroll(timestamp) {
 
     if (scrollAmount > 0) window.scrollBy(0, scrollAmount);
 
-    // Eye-follow pauses at punctuation
+    // Eye-follow pause
     if (readingMode === "eye") {
-        const text = safeInnerText(document.elementFromPoint(window.innerWidth / 2, window.innerHeight * 0.55) || "");
+        const text = safeInnerText(document.elementFromPoint(window.innerWidth/2, window.innerHeight*0.55) || "");
         if (/[.,;:!?]/.test(text)) {
             const token = pauseToken;
             targetFactor = 0.45;
@@ -307,49 +470,40 @@ function autoScroll(timestamp) {
         }
     }
 
-    // End of page check + Auto Next
+    // End of page: bounce then next logic
     if (window.innerHeight + window.scrollY + 2 >= document.body.scrollHeight) {
-        // stop local scrolling state now
+        // stop auto scrolling locally
         scrolling = false;
         carry = 0;
         isEyePaused = false;
-
-        // persist exact user-visible state: scrolling is false now
         storage.set({ scrolling: false }).catch(()=>{});
-
         btnScroll.textContent = "Start Scrolling";
 
-        if (!autoNext) return;
+        // perform medium bounce
+        animateBounce({down:8, up:5, downMs:90, upMs:90}).then(async () => {
+            // after bounce, if autoNext is OFF, do nothing
+            if (!autoNext) return;
 
-        // We want to resume on the next page if user had scrolling ON before clicking next.
-        // Set resume flag and then click next.
-        storage.set({ resumeScrolling: true }).catch(()=>{});
+            // set resume flag so next page can resume (user preference preserved)
+            await storage.set({ resumeScrolling: true });
 
-        targetFactor = 0.45;
-        const delay = 350 + Math.random() * 70; // 350..420ms
-
-        setTimeout(() => {
-            const nextBtn = findNextChapterButton();
-            if (nextBtn) {
-                // smooth scroll to button visually
-                try {
-                    nextBtn.scrollIntoView({ behavior: "smooth", block: "center" });
-                } catch (e) { /* ignore */ }
-
-                // slight settle then click
-                setTimeout(() => {
+            // small natural delay then click next if found
+            const delay = 350 + Math.random()*70;
+            setTimeout(() => {
+                const next = findNextChapterButton();
+                if (next) {
                     try {
-                        // clicking should navigate in same tab
-                        nextBtn.click();
-                    } catch (e) {
-                        console.warn("nextBtn.click failed:", e);
-                    }
-                }, 220);
-            } else {
-                // no next found: clear resume flag
-                storage.set({ resumeScrolling: false }).catch(()=>{});
-            }
-        }, delay);
+                        next.scrollIntoView({behavior:'smooth', block:'center'});
+                    } catch {}
+                    setTimeout(()=> {
+                        try { next.click(); } catch(e){ console.warn("click next failed", e); }
+                    }, 220);
+                } else {
+                    // no next found -> clear resume flag
+                    storage.set({ resumeScrolling: false }).catch(()=>{});
+                }
+            }, delay);
+        });
 
         return;
     }
@@ -358,7 +512,7 @@ function autoScroll(timestamp) {
 }
 
 // ----------------------------------------------------
-//  UI Actions & Persistence
+// UI interactions + persistence
 // ----------------------------------------------------
 btnMode.addEventListener("click", () => {
     readingMode = readingMode === "glide" ? "eye" : "glide";
@@ -370,9 +524,14 @@ btnScroll.addEventListener("click", () => {
     scrolling = !scrolling;
     pauseToken++;
     isEyePaused = false;
+    activePausedByUser = false;
+    allowAutoResume = true;
     btnScroll.textContent = scrolling ? "Stop Scrolling" : "Start Scrolling";
     storage.set({ scrolling }).catch(()=>{});
-    if (scrolling) requestAnimationFrame(autoScroll);
+    if (scrolling) {
+        lastTimestamp = null;
+        requestAnimationFrame(autoScroll);
+    }
 });
 
 btnAutoNext.addEventListener("click", () => {
@@ -381,7 +540,6 @@ btnAutoNext.addEventListener("click", () => {
     storage.set({ autoNext }).catch(()=>{});
 });
 
-// speed inputs
 slider.addEventListener("input", () => {
     speed = Number(slider.value);
     speedText.textContent = speed;
@@ -401,18 +559,14 @@ panel.querySelector("#speed-increase").addEventListener("click", () => {
     storage.set({ speed }).catch(()=>{});
 });
 
-// presets
 panel.querySelector(".slow").addEventListener("click", () => {
-    speed = 15; slider.value = 15; speedText.textContent = 15;
-    storage.set({ speed }).catch(()=>{});
+    speed = 15; slider.value = 15; speedText.textContent = 15; storage.set({ speed }).catch(()=>{});
 });
 panel.querySelector(".medium").addEventListener("click", () => {
-    speed = 50; slider.value = 50; speedText.textContent = 50;
-    storage.set({ speed }).catch(()=>{});
+    speed = 50; slider.value = 50; speedText.textContent = 50; storage.set({ speed }).catch(()=>{});
 });
 panel.querySelector(".fast").addEventListener("click", () => {
-    speed = 90; slider.value = 90; speedText.textContent = 90;
-    storage.set({ speed }).catch(()=>{});
+    speed = 90; slider.value = 90; speedText.textContent = 90; storage.set({ speed }).catch(()=>{});
 });
 
 // progress bar
@@ -424,6 +578,4 @@ function updateProgressBar() {
     if (el) el.style.width = progress + "%";
 }
 window.addEventListener("scroll", updateProgressBar);
-
-// initial progress update
 updateProgressBar();
