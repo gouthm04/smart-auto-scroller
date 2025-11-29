@@ -1,11 +1,13 @@
 {
   "manifest_version": 2,
-  "name": "Floating Icon Overlay",
+  "name": "Reader Assist – Smart Auto-Scroll",     
   "version": "1.0",
-  "description": "Shows a floating icon on the top-right of all websites.",
+
+  "description": "Adaptive auto-scrolling with glide mode, page-step mode, and automatic next-chapter detection.",  
 
   "icons": {
-    "48": "icon.png"
+    "48": "logo.png",
+    "128": "logo.png"
   },
 
   "permissions": ["<all_urls>"],
