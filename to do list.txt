@@ -1,0 +1,10 @@
+page endinng with scroller pause it when stops scrolling 
+
+why the speeedd 12 and speed 13 has vast diffrence in speed 
+
+what u think of splitting the speed logic so it handles evry kind of spped smoothlyy like slow also in smooth motion not that stuck motion 
+
+also speed <10 like off btn we need to nadle the logic more efficenlty
+
+if speed is less than 13 then page flickers/vibrates kinda with scrolling not that smooth 
+    kinda like stuck then move stuck agin 
