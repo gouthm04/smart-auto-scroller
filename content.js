@@ -61,6 +61,19 @@ const btnMode = panel.querySelector("#btn-reading-mode");
 icon.addEventListener("click", () => {
     panel.classList.toggle("open");
 });
+// Smooth decel/accel factors
+let smoothFactor = 1;     // dynamic multiplier
+let targetFactor = 1;     // where we want factor to move toward
+
+function updateSmoothFactor(elapsed) {
+    const lerpSpeed = 0.12; // smoothness (A2 balanced)
+
+    smoothFactor += (targetFactor - smoothFactor) * lerpSpeed * (elapsed / 16.67);
+
+    // clamp
+    if (smoothFactor < 0.2) smoothFactor = 0.2;
+    if (smoothFactor > 1) smoothFactor = 1;
+}
 
 // AUTO SCROLL ENGINE
 function autoScroll(timestamp) {
@@ -71,7 +84,6 @@ function autoScroll(timestamp) {
         return;
     }
 
-    // resume if eye mode paused earlier
     if (isEyePaused) return;
 
     if (!lastTimestamp) lastTimestamp = timestamp;
@@ -80,7 +92,9 @@ function autoScroll(timestamp) {
 
     const normalized = speed / 100;
     const baseSpeed = Math.pow(normalized, 1.7) * 8;
-    const pixels = baseSpeed * (elapsed / 16.67);
+
+    updateSmoothFactor(elapsed);
+    const pixels = baseSpeed * smoothFactor * (elapsed / 16.67);
 
     carry += pixels;
     const scrollAmount = Math.floor(carry);
@@ -88,7 +102,9 @@ function autoScroll(timestamp) {
 
     if (scrollAmount > 0) window.scrollBy(0, scrollAmount);
 
-    // --- EYE MODE ---
+    // ---------------------------
+    // EYE MODE
+    // ---------------------------
     if (readingMode === "eye") {
         const text = document.elementFromPoint(
             window.innerWidth / 2,
@@ -96,17 +112,29 @@ function autoScroll(timestamp) {
         )?.innerText || "";
 
         if (/[.,;:!?]/.test(text)) {
+
             const myToken = pauseToken;
-            isEyePaused = true;  // <-- FIX: do not modify scrolling
+
+            // 1) Begin slowing down
+            targetFactor = 0.45;
 
             setTimeout(() => {
-                const tokenChanged = myToken !== pauseToken;
 
-                if (!tokenChanged && scrolling) {
-                    isEyePaused = false;
-                    requestAnimationFrame(autoScroll);
-                }
-            }, 220 + (100 - speed) * 2.5);
+                // 2) Fully pause
+                isEyePaused = true;
+                targetFactor = 1; // reset
+
+                setTimeout(() => {
+
+                    const tokenChanged = myToken !== pauseToken;
+                    if (!tokenChanged && scrolling) {
+                        isEyePaused = false;
+                        requestAnimationFrame(autoScroll);
+                    }
+
+                }, 220 + (100 - speed) * 2.5);
+
+            }, 120);
 
             return;
         }
@@ -123,6 +151,7 @@ function autoScroll(timestamp) {
 
     requestAnimationFrame(autoScroll);
 }
+
 
 // MODE TOGGLE
 btnMode.addEventListener("click", () => {
@@ -167,7 +196,7 @@ panel.querySelector("#speed-increase").addEventListener("click", () => {
 
 // PRESETS
 panel.querySelector(".slow").addEventListener("click", () => {
-    speed = 20; slider.value = 20; speedText.textContent = 20;
+    speed = 15; slider.value = 15; speedText.textContent = 15;
 });
 panel.querySelector(".medium").addEventListener("click", () => {
     speed = 50; slider.value = 50; speedText.textContent = 50;
